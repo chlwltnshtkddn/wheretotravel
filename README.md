@@ -79,3 +79,15 @@
 - 이미지 소스 정책: `Unsplash`, `Pexels`, `Pixabay` API only
 - Place 단위 이미지 메타 연결
 - 라이선스/출처 추적 필드 확장
+
+## Real Image Replace Batch
+
+1. Set at least one provider key in `.env`
+   - `PIXABAY_API_KEY` or `PEXELS_API_KEY` or `UNSPLASH_ACCESS_KEY`
+2. Run full replace (1740 places)
+   - `python scripts/fetch_real_images_and_upload.py`
+3. Optional smoke test first
+   - `set MAX_PLACES=20 && python scripts/fetch_real_images_and_upload.py`
+
+The script overwrites current placeholder keys:
+`images/placeholders/{country_code}/{place_id}.jpg`

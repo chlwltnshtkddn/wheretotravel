@@ -99,7 +99,7 @@ const state = {
   tagIndexMap: {},
   stage: 1,
   stage1Target: 10,
-  stage2Target: 27,
+  stage2Target: 30,
   stage1Pool: [],
   stage2Pool: [],
   cursor: 0,
@@ -473,7 +473,7 @@ const pickDiverseStage1Pool = () => {
 };
 
 const buildStage2Pool = () => {
-  state.stage2Target = 27;
+  state.stage2Target = 30;
 
   const candidates = state.allPlaces
     .filter((p) => !state.seenPlaceIds.has(p.place_id))
