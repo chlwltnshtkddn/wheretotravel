@@ -47,6 +47,13 @@
 2. 브라우저에서 열기
    - `http://localhost:8787/index.html`
 
+## Deploy to Cloudflare Pages (Static Front)
+
+1. 배포 아티팩트 생성
+   - `npm.cmd run build:pages`
+2. Pages 배포
+   - `npm.cmd run deploy:pages`
+
 ## Run Backend (Local Storage)
 
 1. 백엔드 실행

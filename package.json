@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node backend/server.js",
     "check:server": "node --check backend/server.js",
-    "check:web": "node --check app.js"
+    "check:web": "node --check app.js",
+    "build:pages": "node scripts/build_pages_dist.js",
+    "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name wheretotravel --branch main"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.917.0",
