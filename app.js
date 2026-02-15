@@ -261,42 +261,98 @@ const buildR2ImageKey = (place) => {
   return `images/placeholders/${place.country_code}/${place.place_id}.jpg`;
 };
 
+const pagesImageUrl = (place) =>
+  `/img/${encodeURIComponent(place.country_code)}/${encodeURIComponent(place.place_id)}.jpg`;
+
 const directR2ImageUrl = (place) => `${R2_IMAGE_BASE}/${buildR2ImageKey(place)}`;
+
+const requestSignedImageUrl = async (place) => {
+  try {
+    const key = encodeURIComponent(buildR2ImageKey(place));
+    const res = await fetch(`/api/r2/signed-url?key=${key}&expires=1800`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url || null;
+  } catch {
+    return null;
+  }
+};
+
+const tryRenderImageUrl = (url, token) => {
+  return new Promise((resolve) => {
+    if (!url || token !== state.imageLoadToken) {
+      resolve(false);
+      return;
+    }
+
+    dom.placeImage.onload = () => {
+      if (token !== state.imageLoadToken) {
+        resolve(false);
+        return;
+      }
+      dom.placeImage.classList.remove("is-hidden");
+      resolve(true);
+    };
+    dom.placeImage.onerror = () => resolve(false);
+    dom.placeImage.src = url;
+  });
+};
+
+const buildGeneratedPlaceholderUrl = (place) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 800;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  ctx.fillStyle = "#0a0a0a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ffd84d";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const title = place.city || place.name_en || "Destination";
+  const subtitle = place.name_en || "";
+  const country = `${countryName(place.__country)} (${place.country_code})`;
+
+  ctx.font = "700 78px Arial";
+  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 90);
+  ctx.font = "600 44px Arial";
+  ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 10);
+  ctx.font = "600 36px Arial";
+  ctx.fillText(country, canvas.width / 2, canvas.height / 2 + 92);
+
+  return canvas.toDataURL("image/jpeg", 0.9);
+};
 
 const loadPlaceImage = async (place) => {
   const token = ++state.imageLoadToken;
   const fallback = () => {
     if (token !== state.imageLoadToken) return;
-    dom.placeImage.classList.add("is-hidden");
-    dom.placeImage.removeAttribute("src");
+    const generated = buildGeneratedPlaceholderUrl(place);
+    if (!generated) {
+      dom.placeImage.classList.add("is-hidden");
+      dom.placeImage.removeAttribute("src");
+      return;
+    }
+    dom.placeImage.onload = null;
+    dom.placeImage.onerror = null;
+    dom.placeImage.classList.remove("is-hidden");
+    dom.placeImage.src = generated;
   };
 
-  // 1) 백엔드가 있으면 signed-url 우선
-  try {
-    const key = encodeURIComponent(buildR2ImageKey(place));
-    const res = await fetch(`/api/r2/signed-url?key=${key}&expires=1800`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.url) {
-        if (token !== state.imageLoadToken) return;
-        dom.placeImage.classList.remove("is-hidden");
-        dom.placeImage.src = data.url;
-        return;
-      }
-    }
-  } catch {
-    // no-op, direct URL fallback
+  const candidates = [pagesImageUrl(place)];
+  const signed = await requestSignedImageUrl(place);
+  if (signed) candidates.push(signed);
+  candidates.push(directR2ImageUrl(place));
+
+  for (const url of candidates) {
+    const ok = await tryRenderImageUrl(url, token);
+    if (ok) return;
   }
 
-  // 2) 공개 버킷/도메인이 설정된 경우 direct URL 시도
-  const url = directR2ImageUrl(place);
-  dom.placeImage.onload = () => {
-    if (token !== state.imageLoadToken) return;
-    dom.placeImage.classList.remove("is-hidden");
-  };
-  dom.placeImage.onerror = fallback;
-  if (token !== state.imageLoadToken) return;
-  dom.placeImage.src = url;
+  fallback();
 };
 
 const renderCurrentCard = () => {
@@ -455,32 +511,83 @@ const undo = () => {
 };
 
 const resolveCountryRecommendations = () => {
+  const countryPref = {};
+  const placePref = {};
+  state.votes.forEach((vote) => {
+    if (vote.choice === "neutral") return;
+    const delta = vote.choice === "like" ? 1 : -1;
+    const countryCode = vote.place.country_code;
+    countryPref[countryCode] = (countryPref[countryCode] ?? 0) + delta;
+    placePref[vote.place.place_id] = (placePref[vote.place.place_id] ?? 0) + delta;
+  });
+
+  const countryNorm = Math.max(1, ...Object.values(countryPref).map((value) => Math.abs(value)));
+  const placeNorm = Math.max(1, ...Object.values(placePref).map((value) => Math.abs(value)));
+  const weakVector = magnitude(state.userVector) < 0.15;
+  const countryPrefWeight = weakVector ? 0.25 : 0.12;
+  const placePrefWeight = weakVector ? 0.18 : 0.08;
+
   const rankedCountries = state.countries
     .map((country) => ({
       country,
-      score: similarityScore(state.userVector, country.tags_vector),
+      score:
+        similarityScore(state.userVector, country.tags_vector) +
+        ((countryPref[country.country_code] ?? 0) / countryNorm) * countryPrefWeight,
     }))
     .sort((a, b) => b.score - a.score);
 
-  const primaryCountry = rankedCountries[0]?.country;
+  const topCountryPool = weakVector
+    ? rankedCountries.slice(0, Math.min(12, rankedCountries.length))
+    : rankedCountries.slice(0, 1);
+  const primaryCountry =
+    topCountryPool[Math.floor(Math.random() * topCountryPool.length)]?.country ||
+    rankedCountries[0]?.country;
   const secondaryCountry =
-    rankedCountries.find((row) => row.country.region !== primaryCountry?.region)?.country ||
-    rankedCountries[1]?.country;
+    rankedCountries.find(
+      (row) =>
+        row.country.country_code !== primaryCountry?.country_code &&
+        row.country.region !== primaryCountry?.region
+    )?.country ||
+    rankedCountries.find((row) => row.country.country_code !== primaryCountry?.country_code)
+      ?.country ||
+    rankedCountries[1]?.country ||
+    rankedCountries[0]?.country;
 
-  const bestPlaceFromCountry = (country) => {
-    return country.places
-      .map((place) => ({ place, score: similarityScore(state.userVector, place.tags_vector) }))
-      .sort((a, b) => b.score - a.score)[0].place;
+  const bestPlaceFromCountry = (country, avoidPlaceId = "") => {
+    if (!country || !country.places?.length) return null;
+
+    const rankedPlaces = country.places
+      .map((place) => ({
+        place,
+        score:
+          similarityScore(state.userVector, place.tags_vector) +
+          ((placePref[place.place_id] ?? 0) / placeNorm) * placePrefWeight,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const filtered = avoidPlaceId
+      ? rankedPlaces.filter((row) => row.place.place_id !== avoidPlaceId)
+      : rankedPlaces;
+
+    const pool = weakVector
+      ? filtered.slice(0, Math.min(3, filtered.length))
+      : filtered.slice(0, 1);
+    if (!pool.length) return filtered[0]?.place || country.places[0];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    return pick.place;
   };
+
+  const primaryPlace = bestPlaceFromCountry(primaryCountry);
+  const secondaryPlace = bestPlaceFromCountry(secondaryCountry, primaryPlace?.place_id || "");
 
   return {
     primary: {
       country: primaryCountry,
-      place: bestPlaceFromCountry(primaryCountry),
+      place: primaryPlace,
     },
     secondary: {
       country: secondaryCountry,
-      place: bestPlaceFromCountry(secondaryCountry),
+      place: secondaryPlace,
     },
   };
 };

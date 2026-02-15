@@ -348,33 +348,75 @@ function placeReasons(place, userVector) {
 }
 
 function buildRecommendation(session) {
+  const countryPref = {};
+  const placePref = {};
+  for (const vote of session.votes) {
+    if (vote.choice === "neutral") continue;
+    const delta = vote.choice === "like" ? 1 : -1;
+    const place = state.placesById.get(vote.place_id);
+    if (!place) continue;
+    countryPref[place.country_code] = (countryPref[place.country_code] ?? 0) + delta;
+    placePref[place.place_id] = (placePref[place.place_id] ?? 0) + delta;
+  }
+
+  const countryNorm = Math.max(1, ...Object.values(countryPref).map((v) => Math.abs(v)));
+  const placeNorm = Math.max(1, ...Object.values(placePref).map((v) => Math.abs(v)));
+  const weakVector = magnitude(session.user_vector) < 0.15;
+  const countryPrefWeight = weakVector ? 0.25 : 0.12;
+  const placePrefWeight = weakVector ? 0.18 : 0.08;
+
   const rankedCountries = state.countries
     .map((country) => ({
       country,
-      score: similarityScore(session.user_vector, country.tags_vector),
+      score:
+        similarityScore(session.user_vector, country.tags_vector) +
+        ((countryPref[country.country_code] ?? 0) / countryNorm) * countryPrefWeight,
     }))
     .sort((a, b) => b.score - a.score);
 
-  const primaryCountry = rankedCountries[0]?.country;
+  const topCountryPool = weakVector
+    ? rankedCountries.slice(0, Math.min(12, rankedCountries.length))
+    : rankedCountries.slice(0, 1);
+  const primaryCountry =
+    topCountryPool[Math.floor(Math.random() * topCountryPool.length)]?.country ||
+    rankedCountries[0]?.country;
   const secondaryCountry =
-    rankedCountries.find((row) => row.country.region !== primaryCountry?.region)?.country ||
-    rankedCountries[1]?.country;
+    rankedCountries.find(
+      (row) =>
+        row.country.country_code !== primaryCountry?.country_code &&
+        row.country.region !== primaryCountry?.region
+    )?.country ||
+    rankedCountries.find((row) => row.country.country_code !== primaryCountry?.country_code)
+      ?.country ||
+    rankedCountries[1]?.country ||
+    rankedCountries[0]?.country;
   if (!primaryCountry || !secondaryCountry) {
     throw createError("insufficient country data", 500);
   }
 
-  function bestPlace(country) {
+  function bestPlace(country, avoidPlaceId = "") {
     const rows = country.places
       .map((place) => ({
         place: state.placesById.get(place.place_id),
-        score: similarityScore(session.user_vector, place.tags_vector),
+        score:
+          similarityScore(session.user_vector, place.tags_vector) +
+          ((placePref[place.place_id] ?? 0) / placeNorm) * placePrefWeight,
       }))
+      .filter((row) => row.place)
       .sort((a, b) => b.score - a.score);
-    return rows[0].place;
+
+    const filtered = avoidPlaceId
+      ? rows.filter((row) => row.place.place_id !== avoidPlaceId)
+      : rows;
+    const pool = weakVector
+      ? filtered.slice(0, Math.min(3, filtered.length))
+      : filtered.slice(0, 1);
+    if (!pool.length) return filtered[0]?.place || rows[0]?.place;
+    return pool[Math.floor(Math.random() * pool.length)].place;
   }
 
   const primaryPlace = bestPlace(primaryCountry);
-  const secondaryPlace = bestPlace(secondaryCountry);
+  const secondaryPlace = bestPlace(secondaryCountry, primaryPlace?.place_id || "");
   const persona = resolvePersona(session.user_vector);
 
   return {
