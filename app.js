@@ -309,28 +309,47 @@ const tryRenderImageUrl = (url, token, timeoutMs = 3000) => {
 
 const buildGeneratedPlaceholderUrl = (place) => {
   const canvas = document.createElement("canvas");
-  canvas.width = 1200;
-  canvas.height = 800;
+  canvas.width = 1280;
+  canvas.height = 720;
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
 
   ctx.fillStyle = "#0a0a0a";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "#ffd84d";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  const yellow = "#f7d657";
+  const yellowDim = "#d4b039";
+
+  // frame (roughly matching uploaded placeholder style)
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = yellowDim;
+  ctx.strokeRect(24, 24, canvas.width - 48, canvas.height - 48);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#50461e";
+  ctx.strokeRect(46, 46, canvas.width - 92, canvas.height - 92);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 
   const title = place.city || place.name_en || "Destination";
   const subtitle = place.name_en || "";
   const country = `${countryName(place.__country)} (${place.country_code})`;
 
-  ctx.font = "700 78px Arial";
-  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 90);
-  ctx.font = "600 44px Arial";
-  ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 10);
-  ctx.font = "600 36px Arial";
-  ctx.fillText(country, canvas.width / 2, canvas.height / 2 + 92);
+  const left = 90;
+  let top = 120;
+  ctx.font = "600 34px Arial";
+  ctx.fillStyle = yellowDim;
+  ctx.fillText(title, left, top);
+  top += 72;
+
+  ctx.font = "700 46px Arial";
+  ctx.fillStyle = yellow;
+  ctx.fillText(subtitle, left, top);
+  top += 78;
+
+  ctx.font = "700 34px Arial";
+  ctx.fillStyle = yellowDim;
+  ctx.fillText(country, left, top);
 
   return canvas.toDataURL("image/jpeg", 0.9);
 };
@@ -338,12 +357,21 @@ const buildGeneratedPlaceholderUrl = (place) => {
 const loadPlaceImage = async (place) => {
   const token = ++state.imageLoadToken;
   const generated = buildGeneratedPlaceholderUrl(place);
-  dom.placeImage.classList.add("is-hidden");
-  dom.placeImage.removeAttribute("src");
+  if (generated) {
+    dom.placeImage.classList.remove("is-hidden");
+    dom.placeImage.src = generated;
+  } else {
+    dom.placeImage.classList.add("is-hidden");
+    dom.placeImage.removeAttribute("src");
+  }
 
   const fallback = () => {
     if (token !== state.imageLoadToken) return;
-    if (!generated) return;
+    if (!generated) {
+      dom.placeImage.classList.add("is-hidden");
+      dom.placeImage.removeAttribute("src");
+      return;
+    }
     dom.placeImage.onload = null;
     dom.placeImage.onerror = null;
     dom.placeImage.classList.remove("is-hidden");
@@ -359,7 +387,7 @@ const loadPlaceImage = async (place) => {
 
   for (let i = 0; i < candidates.length; i += 1) {
     const url = candidates[i];
-    const timeoutMs = i === 0 ? 1500 : 700;
+    const timeoutMs = i === 0 ? 2200 : 900;
     const ok = await tryRenderImageUrl(url, token, timeoutMs);
     if (ok) return;
   }
@@ -500,6 +528,8 @@ const vote = (choice) => {
       state.stage2Pool = buildStage2Pool();
       state.stage = 2;
       state.cursor = 0;
+      prefetchPlaceImage(state.stage2Pool[0]);
+      prefetchPlaceImage(state.stage2Pool[1]);
       dom.statusPill.textContent = "Stage 2 in progress";
       trackEvent("stage1_complete", { stage2Target: state.stage2Target });
       showToast(`Stage 2 시작: ${state.stage2Target}장`);
@@ -717,6 +747,8 @@ const startJourney = () => {
   state.prefetchedImageKeys = new Set();
   state.stage1Pool = pickDiverseStage1Pool();
   state.stage2Pool = [];
+  prefetchPlaceImage(state.stage1Pool[0]);
+  prefetchPlaceImage(state.stage1Pool[1]);
   dom.statusPill.textContent = "Stage 1 in progress";
   setScreen("swipe");
   renderCurrentCard();
