@@ -1,0 +1,5 @@
+node_modules/
+.env
+
+# Runtime local storage
+data/runtime/

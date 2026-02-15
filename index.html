@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wheretotravel MVP</title>
+    <meta
+      name="description"
+      content="사진 Like/Dislike 기반 여행 취향 분석 및 국가/도시 추천 MVP"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+    <div class="bg-grid"></div>
+
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="brand-kicker">Wheretotravel MVP</p>
+          <h1>우리 어디갈까?</h1>
+        </div>
+        <div class="status-pill" id="statusPill">데이터 로딩중...</div>
+      </header>
+
+      <section id="screen-landing" class="screen is-active">
+        <p class="eta-badge">약 2~3분</p>
+        <h2>10장 탐색 + 26~30장 정밀 선택으로 여행 취향을 바로 찾습니다.</h2>
+        <p class="lead">
+          규칙 기반 벡터 추천으로 국가/도시를 계산하고, 결과 설명과 공유 문구는 GPT API
+          레이어로 확장 가능한 구조입니다.
+        </p>
+        <button id="startBtn" class="btn btn-primary">여행 취향 찾기 시작</button>
+        <p class="fine-print">
+          이미지 수집 2차 계획: Unsplash / Pexels / Pixabay API only
+        </p>
+      </section>
+
+      <section id="screen-swipe" class="screen">
+        <div class="swipe-head">
+          <div>
+            <p class="swipe-stage" id="stageLabel">Stage 1</p>
+            <p class="swipe-counter" id="counterLabel">0 / 10</p>
+          </div>
+          <button id="undoBtn" class="btn btn-ghost" disabled>이전 카드</button>
+        </div>
+
+        <div class="progress-wrap" aria-hidden="true">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+
+        <article class="place-card" id="placeCard">
+          <div class="card-visual" id="cardVisual"></div>
+          <div class="card-body">
+            <p class="card-city" id="placeCity">-</p>
+            <h3 id="placeName">-</h3>
+            <p class="card-country" id="placeCountry">-</p>
+            <div id="tagChips" class="chip-row"></div>
+          </div>
+        </article>
+
+        <div class="vote-controls">
+          <button id="dislikeBtn" class="btn btn-danger">Dislike</button>
+          <button id="neutralBtn" class="btn btn-neutral">Neutral</button>
+          <button id="likeBtn" class="btn btn-like">Like</button>
+        </div>
+
+        <div class="ads-note">
+          <span>AdSlot Placeholder</span>
+          <small>입력 흐름을 방해하지 않는 하단 고정형 슬롯 위치</small>
+        </div>
+      </section>
+
+      <section id="screen-result" class="screen">
+        <div class="result-grid">
+          <article class="result-card persona-card">
+            <p class="result-kicker">Travel Persona</p>
+            <h2 id="personaName">-</h2>
+            <p id="personaSummary">-</p>
+          </article>
+
+          <article class="result-card">
+            <p class="result-kicker">대표 추천</p>
+            <h3 id="primaryTitle">-</h3>
+            <ul id="primaryReasons" class="reason-list"></ul>
+          </article>
+
+          <article class="result-card">
+            <p class="result-kicker">대안 추천</p>
+            <h3 id="secondaryTitle">-</h3>
+            <ul id="secondaryReasons" class="reason-list"></ul>
+          </article>
+        </div>
+
+        <form id="contextForm" class="context-form">
+          <label>
+            인원
+            <input id="travelersInput" type="number" min="1" max="10" value="2" required />
+          </label>
+          <label>
+            예상 월
+            <input id="monthInput" type="month" />
+          </label>
+          <label>
+            예산
+            <select id="budgetInput">
+              <option value="low">Low</option>
+              <option value="mid" selected>Mid</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary">OTA 링크 생성</button>
+        </form>
+
+        <div class="cta-row">
+          <a id="hotelCta" class="btn btn-like is-disabled" href="#" target="_blank" rel="noreferrer">숙소 보기</a>
+          <a id="flightCta" class="btn btn-neutral is-disabled" href="#" target="_blank" rel="noreferrer">항공 보기</a>
+          <button id="shareBtn" class="btn btn-ghost">공유 문구 복사</button>
+        </div>
+
+        <p id="tripBrief" class="trip-brief"></p>
+        <p id="sharePreview" class="share-preview"></p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "wheretotravel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wheretotravel MVP backend + web",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "check:server": "node --check backend/server.js",
+    "check:web": "node --check app.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.917.0",
+    "@aws-sdk/s3-request-presigner": "^3.917.0",
+    "dotenv": "^17.2.3"
+  }
+}

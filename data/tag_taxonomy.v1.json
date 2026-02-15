@@ -1,0 +1,90 @@
+{
+  "version": "v1",
+  "dimension": 12,
+  "tags": [
+    {
+      "index": 0,
+      "id": "forest_nature",
+      "label_ko": "?/??",
+      "label_en": "Forest & Nature",
+      "description": "??, ??, ?? ?? ?? ??"
+    },
+    {
+      "index": 1,
+      "id": "water",
+      "label_ko": "?/??",
+      "label_en": "Water",
+      "description": "??, ?, ??, ?? ?? ??"
+    },
+    {
+      "index": 2,
+      "id": "urban",
+      "label_ko": "??",
+      "label_en": "Urban",
+      "description": "?? ???, ??, ?? ?? ??"
+    },
+    {
+      "index": 3,
+      "id": "relaxation",
+      "label_ko": "??",
+      "label_en": "Relaxation",
+      "description": "??, ???, ?? ?? ??"
+    },
+    {
+      "index": 4,
+      "id": "heritage_culture",
+      "label_ko": "?????",
+      "label_en": "Heritage & Culture",
+      "description": "?? ??, ?? ??, ??? ??"
+    },
+    {
+      "index": 5,
+      "id": "food",
+      "label_ko": "??",
+      "label_en": "Food",
+      "description": "?? ??, ?? ?? ??"
+    },
+    {
+      "index": 6,
+      "id": "nightlife",
+      "label_ko": "????",
+      "label_en": "Nightlife",
+      "description": "??, ?, ??, ?? ??? ??"
+    },
+    {
+      "index": 7,
+      "id": "activity",
+      "label_ko": "????",
+      "label_en": "Activity",
+      "description": "???, ???, ?? ?? ??"
+    },
+    {
+      "index": 8,
+      "id": "shopping",
+      "label_ko": "??",
+      "label_en": "Shopping",
+      "description": "???, ??, ??? ?? ??"
+    },
+    {
+      "index": 9,
+      "id": "luxury",
+      "label_ko": "???",
+      "label_en": "Luxury",
+      "description": "?? ??, ???? ?? ??"
+    },
+    {
+      "index": 10,
+      "id": "exoticness",
+      "label_ko": "???",
+      "label_en": "Exoticness",
+      "description": "?? ??/??? ?? ??"
+    },
+    {
+      "index": 11,
+      "id": "landmark_architecture",
+      "label_ko": "???????",
+      "label_en": "Landmark & Architecture",
+      "description": "?? ????, ?? ?? ??"
+    }
+  ]
+}
