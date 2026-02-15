@@ -98,7 +98,7 @@ const state = {
   tagIndexMap: {},
   stage: 1,
   stage1Target: 10,
-  stage2Target: 28,
+  stage2Target: 27,
   stage1Pool: [],
   stage2Pool: [],
   cursor: 0,
@@ -336,17 +336,16 @@ const buildGeneratedPlaceholderUrl = (place) => {
 const loadPlaceImage = async (place) => {
   const token = ++state.imageLoadToken;
   const generated = buildGeneratedPlaceholderUrl(place);
-  if (generated) {
-    dom.placeImage.classList.remove("is-hidden");
-    dom.placeImage.src = generated;
-  }
+  dom.placeImage.classList.add("is-hidden");
+  dom.placeImage.removeAttribute("src");
 
   const fallback = () => {
     if (token !== state.imageLoadToken) return;
-    if (!generated) {
-      dom.placeImage.classList.add("is-hidden");
-      dom.placeImage.removeAttribute("src");
-    }
+    if (!generated) return;
+    dom.placeImage.onload = null;
+    dom.placeImage.onerror = null;
+    dom.placeImage.classList.remove("is-hidden");
+    dom.placeImage.src = generated;
   };
 
   const candidates = [pagesImageUrl(place)];
@@ -427,9 +426,7 @@ const pickDiverseStage1Pool = () => {
 };
 
 const buildStage2Pool = () => {
-  const min = 26;
-  const max = 30;
-  state.stage2Target = min + Math.floor(Math.random() * (max - min + 1));
+  state.stage2Target = 27;
 
   const candidates = state.allPlaces
     .filter((p) => !state.seenPlaceIds.has(p.place_id))
@@ -484,6 +481,7 @@ const vote = (choice) => {
       state.stage2Pool = buildStage2Pool();
       state.stage = 2;
       state.cursor = 0;
+      dom.statusPill.textContent = "Stage 2 in progress";
       trackEvent("stage1_complete", { stage2Target: state.stage2Target });
       showToast(`Stage 2 시작: ${state.stage2Target}장`);
       renderCurrentCard();
@@ -699,7 +697,7 @@ const startJourney = () => {
   state.seenPlaceIds = new Set();
   state.stage1Pool = pickDiverseStage1Pool();
   state.stage2Pool = [];
-  dom.statusPill.textContent = "Stage 1 진행중";
+  dom.statusPill.textContent = "Stage 1 in progress";
   setScreen("swipe");
   renderCurrentCard();
   trackEvent("start_click");

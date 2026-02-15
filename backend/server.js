@@ -241,7 +241,7 @@ function pickStage1Pool(target = 10) {
 }
 
 function buildStage2Pool(session) {
-  const target = 26 + Math.floor(Math.random() * 5); // 26~30
+  const target = 27;
   const seen = new Set(session.votes.map((vote) => vote.place_id));
   const candidates = state.allPlaces
     .filter((place) => !seen.has(place.place_id))
