@@ -278,22 +278,29 @@ const requestSignedImageUrl = async (place) => {
   }
 };
 
-const tryRenderImageUrl = (url, token) => {
+const tryRenderImageUrl = (url, token, timeoutMs = 3000) => {
   return new Promise((resolve) => {
     if (!url || token !== state.imageLoadToken) {
       resolve(false);
       return;
     }
 
-    dom.placeImage.onload = () => {
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
       if (token !== state.imageLoadToken) {
         resolve(false);
         return;
       }
-      dom.placeImage.classList.remove("is-hidden");
-      resolve(true);
+      if (ok) dom.placeImage.classList.remove("is-hidden");
+      resolve(ok);
     };
-    dom.placeImage.onerror = () => resolve(false);
+
+    const timer = window.setTimeout(() => finish(false), timeoutMs);
+    dom.placeImage.onload = () => finish(true);
+    dom.placeImage.onerror = () => finish(false);
     dom.placeImage.src = url;
   });
 };
@@ -328,18 +335,18 @@ const buildGeneratedPlaceholderUrl = (place) => {
 
 const loadPlaceImage = async (place) => {
   const token = ++state.imageLoadToken;
+  const generated = buildGeneratedPlaceholderUrl(place);
+  if (generated) {
+    dom.placeImage.classList.remove("is-hidden");
+    dom.placeImage.src = generated;
+  }
+
   const fallback = () => {
     if (token !== state.imageLoadToken) return;
-    const generated = buildGeneratedPlaceholderUrl(place);
     if (!generated) {
       dom.placeImage.classList.add("is-hidden");
       dom.placeImage.removeAttribute("src");
-      return;
     }
-    dom.placeImage.onload = null;
-    dom.placeImage.onerror = null;
-    dom.placeImage.classList.remove("is-hidden");
-    dom.placeImage.src = generated;
   };
 
   const candidates = [pagesImageUrl(place)];
