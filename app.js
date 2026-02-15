@@ -90,6 +90,7 @@ const VISUAL_COLORS = {
 const DEFAULT_R2_IMAGE_BASE =
   "https://7129b3f4bf1db5e71866bf165166115c.r2.cloudflarestorage.com/wheretotravel-dev";
 const R2_IMAGE_BASE = window.WHERETO_R2_IMAGE_BASE || DEFAULT_R2_IMAGE_BASE;
+const IS_LOCAL_RUNTIME = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 const state = {
   tags: [],
@@ -109,6 +110,7 @@ const state = {
   secondary: null,
   persona: null,
   imageLoadToken: 0,
+  prefetchedImageKeys: new Set(),
 };
 
 const dom = {
@@ -349,16 +351,31 @@ const loadPlaceImage = async (place) => {
   };
 
   const candidates = [pagesImageUrl(place)];
-  const signed = await requestSignedImageUrl(place);
-  if (signed) candidates.push(signed);
-  candidates.push(directR2ImageUrl(place));
+  if (IS_LOCAL_RUNTIME) {
+    const signed = await requestSignedImageUrl(place);
+    if (signed) candidates.push(signed);
+    candidates.push(directR2ImageUrl(place));
+  }
 
-  for (const url of candidates) {
-    const ok = await tryRenderImageUrl(url, token);
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i];
+    const timeoutMs = i === 0 ? 1500 : 700;
+    const ok = await tryRenderImageUrl(url, token, timeoutMs);
     if (ok) return;
   }
 
   fallback();
+};
+
+const prefetchPlaceImage = (place) => {
+  if (!place) return;
+  const cacheKey = `${place.country_code}:${place.place_id}`;
+  if (state.prefetchedImageKeys.has(cacheKey)) return;
+  state.prefetchedImageKeys.add(cacheKey);
+
+  const img = new Image();
+  img.decoding = "async";
+  img.src = pagesImageUrl(place);
 };
 
 const renderCurrentCard = () => {
@@ -394,6 +411,8 @@ const renderCurrentCard = () => {
   });
   setCardVisual(place);
   loadPlaceImage(place);
+  const nextPlace = getCurrentPool()[state.cursor + 1];
+  prefetchPlaceImage(nextPlace);
   dom.undoBtn.disabled = state.cursor === 0;
 };
 
@@ -695,6 +714,7 @@ const startJourney = () => {
   state.votes = [];
   state.userVector = new Array(state.tags.length).fill(0);
   state.seenPlaceIds = new Set();
+  state.prefetchedImageKeys = new Set();
   state.stage1Pool = pickDiverseStage1Pool();
   state.stage2Pool = [];
   dom.statusPill.textContent = "Stage 1 in progress";
