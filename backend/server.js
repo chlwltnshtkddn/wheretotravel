@@ -161,6 +161,25 @@ function dot(a, b) {
   return sum;
 }
 
+function magnitude(vec) {
+  let sum = 0;
+  for (let i = 0; i < vec.length; i += 1) sum += vec[i] * vec[i];
+  return Math.sqrt(sum);
+}
+
+function cosineSimilarity(a, b) {
+  const ma = magnitude(a);
+  const mb = magnitude(b);
+  if (!ma || !mb) return 0;
+  return dot(a, b) / (ma * mb);
+}
+
+function similarityScore(a, b) {
+  const cos = cosineSimilarity(a, b);
+  const raw = dot(a, b) / (a.length || 1);
+  return cos * 0.85 + raw * 0.15;
+}
+
 function topTagIdsFromVector(vector, count = 3) {
   return state.tags
     .map((tag, idx) => ({ id: tag.id, score: vector[idx] ?? 0 }))
@@ -228,7 +247,7 @@ function buildStage2Pool(session) {
     .filter((place) => !seen.has(place.place_id))
     .map((place) => ({
       place,
-      score: dot(session.user_vector, place.tags_vector),
+      score: similarityScore(session.user_vector, place.tags_vector),
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 500);
@@ -332,12 +351,14 @@ function buildRecommendation(session) {
   const rankedCountries = state.countries
     .map((country) => ({
       country,
-      score: dot(session.user_vector, country.tags_vector),
+      score: similarityScore(session.user_vector, country.tags_vector),
     }))
     .sort((a, b) => b.score - a.score);
 
   const primaryCountry = rankedCountries[0]?.country;
-  const secondaryCountry = rankedCountries[1]?.country;
+  const secondaryCountry =
+    rankedCountries.find((row) => row.country.region !== primaryCountry?.region)?.country ||
+    rankedCountries[1]?.country;
   if (!primaryCountry || !secondaryCountry) {
     throw createError("insufficient country data", 500);
   }
@@ -346,7 +367,7 @@ function buildRecommendation(session) {
     const rows = country.places
       .map((place) => ({
         place: state.placesById.get(place.place_id),
-        score: dot(session.user_vector, place.tags_vector),
+        score: similarityScore(session.user_vector, place.tags_vector),
       }))
       .sort((a, b) => b.score - a.score);
     return rows[0].place;

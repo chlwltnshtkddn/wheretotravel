@@ -87,6 +87,10 @@ const VISUAL_COLORS = {
   landmark_architecture: "#5d767c",
 };
 
+const DEFAULT_R2_IMAGE_BASE =
+  "https://7129b3f4bf1db5e71866bf165166115c.r2.cloudflarestorage.com/wheretotravel-dev";
+const R2_IMAGE_BASE = window.WHERETO_R2_IMAGE_BASE || DEFAULT_R2_IMAGE_BASE;
+
 const state = {
   tags: [],
   countries: [],
@@ -104,6 +108,7 @@ const state = {
   primary: null,
   secondary: null,
   persona: null,
+  imageLoadToken: 0,
 };
 
 const dom = {
@@ -123,6 +128,7 @@ const dom = {
   placeCountry: document.querySelector("#placeCountry"),
   tagChips: document.querySelector("#tagChips"),
   cardVisual: document.querySelector("#cardVisual"),
+  placeImage: document.querySelector("#placeImage"),
   likeBtn: document.querySelector("#likeBtn"),
   neutralBtn: document.querySelector("#neutralBtn"),
   dislikeBtn: document.querySelector("#dislikeBtn"),
@@ -182,6 +188,26 @@ const dot = (a, b) => {
   return s;
 };
 
+const magnitude = (vec) => {
+  let s = 0;
+  for (let i = 0; i < vec.length; i += 1) s += vec[i] * vec[i];
+  return Math.sqrt(s);
+};
+
+const cosineSimilarity = (a, b) => {
+  const ma = magnitude(a);
+  const mb = magnitude(b);
+  if (!ma || !mb) return 0;
+  return dot(a, b) / (ma * mb);
+};
+
+const similarityScore = (a, b) => {
+  // cosine 중심으로 magnitude bias를 줄이고, 약한 dot 신호를 보조로 사용
+  const cos = cosineSimilarity(a, b);
+  const raw = dot(a, b) / (a.length || 1);
+  return cos * 0.85 + raw * 0.15;
+};
+
 const addVectorInPlace = (base, vec, sign) => {
   for (let i = 0; i < base.length; i += 1) {
     base[i] += sign * vec[i];
@@ -231,6 +257,48 @@ const setCardVisual = (place) => {
   dom.cardVisual.style.background = `linear-gradient(140deg, ${colors[0]} 0%, ${colors[1]} 50%, ${colors[2]} 100%)`;
 };
 
+const buildR2ImageKey = (place) => {
+  return `images/placeholders/${place.country_code}/${place.place_id}.jpg`;
+};
+
+const directR2ImageUrl = (place) => `${R2_IMAGE_BASE}/${buildR2ImageKey(place)}`;
+
+const loadPlaceImage = async (place) => {
+  const token = ++state.imageLoadToken;
+  const fallback = () => {
+    if (token !== state.imageLoadToken) return;
+    dom.placeImage.classList.add("is-hidden");
+    dom.placeImage.removeAttribute("src");
+  };
+
+  // 1) 백엔드가 있으면 signed-url 우선
+  try {
+    const key = encodeURIComponent(buildR2ImageKey(place));
+    const res = await fetch(`/api/r2/signed-url?key=${key}&expires=1800`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        if (token !== state.imageLoadToken) return;
+        dom.placeImage.classList.remove("is-hidden");
+        dom.placeImage.src = data.url;
+        return;
+      }
+    }
+  } catch {
+    // no-op, direct URL fallback
+  }
+
+  // 2) 공개 버킷/도메인이 설정된 경우 direct URL 시도
+  const url = directR2ImageUrl(place);
+  dom.placeImage.onload = () => {
+    if (token !== state.imageLoadToken) return;
+    dom.placeImage.classList.remove("is-hidden");
+  };
+  dom.placeImage.onerror = fallback;
+  if (token !== state.imageLoadToken) return;
+  dom.placeImage.src = url;
+};
+
 const renderCurrentCard = () => {
   const place = getCurrentPlace();
   const target = getCurrentTarget();
@@ -263,6 +331,7 @@ const renderCurrentCard = () => {
     dom.tagChips.appendChild(chip);
   });
   setCardVisual(place);
+  loadPlaceImage(place);
   dom.undoBtn.disabled = state.cursor === 0;
 };
 
@@ -301,7 +370,7 @@ const buildStage2Pool = () => {
 
   const candidates = state.allPlaces
     .filter((p) => !state.seenPlaceIds.has(p.place_id))
-    .map((p) => ({ place: p, score: dot(state.userVector, p.tags_vector) }))
+    .map((p) => ({ place: p, score: similarityScore(state.userVector, p.tags_vector) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 500);
 
@@ -389,16 +458,18 @@ const resolveCountryRecommendations = () => {
   const rankedCountries = state.countries
     .map((country) => ({
       country,
-      score: dot(state.userVector, country.tags_vector),
+      score: similarityScore(state.userVector, country.tags_vector),
     }))
     .sort((a, b) => b.score - a.score);
 
   const primaryCountry = rankedCountries[0]?.country;
-  const secondaryCountry = rankedCountries[1]?.country;
+  const secondaryCountry =
+    rankedCountries.find((row) => row.country.region !== primaryCountry?.region)?.country ||
+    rankedCountries[1]?.country;
 
   const bestPlaceFromCountry = (country) => {
     return country.places
-      .map((place) => ({ place, score: dot(state.userVector, place.tags_vector) }))
+      .map((place) => ({ place, score: similarityScore(state.userVector, place.tags_vector) }))
       .sort((a, b) => b.score - a.score)[0].place;
   };
 
